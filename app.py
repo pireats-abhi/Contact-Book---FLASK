@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, redirect, session
+import collections
+from flask import Flask, render_template, request, redirect, session, json
 from flask_session import Session
 from flask_mysqldb import MySQL
 import yaml
 
 db = yaml.load(open("db.yaml"))
+
 
 app = Flask(__name__)
 
@@ -35,6 +37,7 @@ def login():
         cur.execute("select * from users where username=%s and password=%s", (name, password,))
 
         account = cur.fetchone()
+        cur.close()
 
         if account:
             session['loggedin'] = True
@@ -52,3 +55,39 @@ def logout():
     session.pop('id', None)
     session.pop('username', None)
     return redirect("/")
+
+@app.route("/register", methods = ["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        email = request.form.get("email")
+
+        cur = mysql.connection.cursor()
+        cur.execute("insert into users (username, password, email) values (%s, %s, %s)", (username, password, email,))
+        mysql.connection.commit()
+        cur.execute("select * from users where username=%s and password=%s", (username, password,))
+
+        account = cur.fetchone()
+        cur.close()
+
+        session['loggedin'] = True
+        session['id'] = account[0]
+        session['username'] = account[1]
+        return redirect("/")
+
+    else:
+        cur = mysql.connection.cursor()
+        cur.execute("select username, email from users")
+
+        account = cur.fetchall()
+        cur.close()
+        
+        results = []
+        for acc in account:
+            d = collections.OrderedDict()
+            d['username'] = acc[0]
+            d['email'] = acc[1]
+            results.append(d)
+
+        return render_template("register.html", result = json.dumps(results, sort_keys=False))

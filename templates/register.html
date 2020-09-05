@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Contact</title>
+    </head>
+    <body>
+        {% for acc in result %}
+        {{ acc }}
+        {% endfor %}
+
+        <form action="/register" method="POST">
+            Username: <input type="text" name="username">
+            email: <input type="text" name="email">
+            password: <input type="password" name="password">
+            <input type="submit" value="submit">
+        </form>
+    </body>
+</html>
