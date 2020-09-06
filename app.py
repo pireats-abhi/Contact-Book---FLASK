@@ -6,7 +6,6 @@ import yaml
 
 db = yaml.load(open("db.yaml"))
 
-
 app = Flask(__name__)
 
 app.config["SESSION_PERMANENT"] = False
@@ -23,7 +22,23 @@ mysql = MySQL(app)
 @app.route("/")
 def contact():
     if "loggedin" in session:
-        return render_template("contact.html", username=session["username"])
+        cur = mysql.connection.cursor()
+        cur.execute("select * from contact where user_id = %s", (session['id'],))
+        account = cur.fetchall()
+        cur.close()
+
+        results = []
+        for acc in account:
+            d = collections.OrderedDict()
+            d['id'] = acc[0]
+            d['name'] = acc[1]
+            d['email'] = acc[2]
+            d['phone_number'] = acc[3]
+            results.append(d)
+
+        result = {'username' : session['username'], 'contact' : results}
+        return render_template("contact.html", result = json.dumps(result, sort_keys=False))
+
     return redirect("/login")
 
 @app.route("/login", methods = ["GET", "POST"])
@@ -43,6 +58,7 @@ def login():
             session['loggedin'] = True
             session['id'] = account[0]
             session['username'] = account[1]
+            session['rule'] = account[4]
             return redirect("/")
         else:
             msg = "incorrect username or password"
@@ -51,9 +67,12 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.pop('loggedin', None)
-    session.pop('id', None)
-    session.pop('username', None)
+    if "loggedin" in session:
+        session.pop('loggedin', None)
+        session.pop('id', None)
+        session.pop('username', None)
+        session.pop('rule', None)
+        return redirect("/")
     return redirect("/")
 
 @app.route("/register", methods = ["GET", "POST"])
@@ -62,9 +81,10 @@ def register():
         username = request.form.get("username")
         password = request.form.get("password")
         email = request.form.get("email")
+        rule = "user"
 
         cur = mysql.connection.cursor()
-        cur.execute("insert into users (username, password, email) values (%s, %s, %s)", (username, password, email,))
+        cur.execute("insert into users (username, password, email, rule) values (%s, %s, %s, %s)", (username, password, email, rule,))
         mysql.connection.commit()
         cur.execute("select * from users where username=%s and password=%s", (username, password,))
 
@@ -74,6 +94,7 @@ def register():
         session['loggedin'] = True
         session['id'] = account[0]
         session['username'] = account[1]
+        session['rule'] = account[4]
         return redirect("/")
 
     else:
@@ -90,4 +111,5 @@ def register():
             d['email'] = acc[1]
             results.append(d)
 
-        return render_template("register.html", result = json.dumps(results, sort_keys=False))
+        result = {'users' : results}
+        return render_template("register.html", result = json.dumps(result, sort_keys=False))
